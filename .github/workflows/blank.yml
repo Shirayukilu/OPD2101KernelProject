@@ -1,29 +1,33 @@
 name: Build Konary Kernel
- on:
-   workflow_dispatch:  # 允许手动触发
-   push:
-     branches: [ main ] # 推送到main分支时自动触发
- jobs:
-   build:
-     runs-on: ubuntu-latest
-     steps:
-       - name: 拉取仓库代码
-         uses: actions/checkout@v4
-         with:
-           fetch-depth: 0
-       - name: 安装依赖
-         run: |
-           sudo apt update && sudo apt install -y build-essential libssl-dev libelf-dev bc bison flex python2
-       - name: 配置工具链
-         run: |
-           # 这里直接使用你仓库里自带的工具链，不用额外下载
-           echo "PATH=$GITHUB_WORKSPACE/toolchain/clang-r547379/bin:$PATH" >> $GITHUB_ENV
-       - name: 运行编译脚本
-         run: |
-           chmod +x buildKonary.sh
-           ./buildKonary.sh
-       - name: 上传编译产物
-         uses: actions/upload-artifact@v4
-         with:
-           name: Konary-Kernel-Build
-           path: build-official-out/arch/arm64/boot/
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update && sudo apt install -y build-essential libssl-dev libelf-dev bc bison flex python2
+
+      - name: Set up environment
+        run: |
+          echo "PATH=$GITHUB_WORKSPACE/toolchain/clang-r547379/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Run build script
+        run: |
+          chmod +x buildKonary.sh
+          ./buildKonary.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Konary-Kernel-Build
+          path: build-official-out/arch/arm64/boot/
