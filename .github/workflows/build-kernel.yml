@@ -32,7 +32,7 @@ on:
           - 'true'
           - 'false'
       ksu_version:
-        description: '自定义 KernelSU 版本号(仅开启KSU生效)'
+        description: '自定义 KernelSU 版本号(暂不生效，仅预留)'
         required: false
         default: 'KSU'
       include_susfs:
@@ -44,11 +44,11 @@ on:
           - 'true'
           - 'false'
       custom_version_name:
-        description: '自定义内核版本后缀'
+        description: '自定义内核版本后缀(暂不生效，仅预留)'
         required: false
         default: 'KonaryKernel'
       include_build_date:
-        description: '版本号追加编译日期'
+        description: '版本号追加编译日期(暂不生效，仅预留)'
         required: true
         default: 'true'
         type: choice
@@ -108,39 +108,16 @@ jobs:
           cp -r susfs/kernel/* .
           rm -rf susfs
 
-      - name: 拼接完整版本字符串
-        id: set_version
-        run: |
-          KERNEL_VER="${{ github.event.inputs.custom_version_name }}"
-          KSU_VER="${{ github.event.inputs.ksu_version }}"
-          if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
-            KERNEL_VER="${KERNEL_VER}-${KSU_VER}"
-          fi
-          if [ "${{ github.event.inputs.include_build_date }}" = "true" ]; then
-            BUILD_DATE=$(date +%Y%m%d)
-            KERNEL_VER="${KERNEL_VER}-${BUILD_DATE}"
-          fi
-          echo "VERSION=${KERNEL_VER}" >> $GITHUB_ENV
-          echo "✅ 内核版本后缀: ${KERNEL_VER}"
-
-      - name: 纯编译内核（不传递任何版本参数）
+      - name: 编译内核
         run: |
           cd /kernel/common
           make ARCH=arm64 LLVM=1 O=out ${{ github.event.inputs.defconfig }}
-          make ARCH=arm64 LLVM=1 O=out -j$(nproc --all)
-
-      - name: 改写内核版本头文件（后置修改，彻底规避编译语法错误）
-        run: |
-          cd /kernel/common/out
-          VER_SUFFIX="-${{ env.VERSION }}"
-          # 替换 utsrelease.h 内的版本后缀
-          sed -i "s/\(UTS_RELEASE.*\)\"/\1${VER_SUFFIX}\"/g" include/generated/utsrelease.h
-          cat include/generated/utsrelease.h
+          make ARCH=arm64 LLVM=1 O=out -j$(nproc)
 
       - name: 上传内核镜像
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-image-${{ github.event.inputs.custom_version_name }}
+          name: kernel-image
           path: |
             /kernel/common/out/arch/arm64/boot/Image.gz
             /kernel/common/out/arch/arm64/boot/Image
@@ -149,26 +126,13 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AK3
           cp /kernel/common/out/arch/arm64/boot/Image.gz AK3/
-
           sed -i 's/do.devicecheck=1/do.devicecheck=0/' AK3/anykernel.sh
           sed -i 's/do.modules=0/do.modules=1/' AK3/anykernel.sh
-
-          KERNEL_VER="${{ github.event.inputs.custom_version_name }}"
-          KSU_VER="${{ github.event.inputs.ksu_version }}"
-          if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
-            KERNEL_VER="${KERNEL_VER}-${KSU_VER}"
-          fi
-          if [ "${{ github.event.inputs.include_build_date }}" = "true" ]; then
-            BUILD_DATE=$(date +%Y%m%d)
-            KERNEL_VER="${KERNEL_VER}-${BUILD_DATE}"
-          fi
-
           cd AK3
-          zip -r9 ../Kernel-${KERNEL_VER}.zip *
-          cd ..
+          zip -r9 ../Kernel.zip *
 
       - name: 上传 AnyKernel3 刷机包
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-anykernel3-${{ github.event.inputs.custom_version_name }}
-          path: Kernel-*.zip
+          name: kernel-anykernel3
+          path: Kernel.zip
