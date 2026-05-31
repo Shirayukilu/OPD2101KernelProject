@@ -123,11 +123,19 @@ jobs:
           echo "VERSION=${KERNEL_VER}" >> $GITHUB_ENV
           echo "✅ 内核版本后缀: ${KERNEL_VER}"
 
-      - name: 编译内核
+      - name: 纯编译内核（不传递任何版本参数）
         run: |
           cd /kernel/common
-          make ARCH=arm64 LLVM=1 O=out ${{ github.event.inputs.defconfig }} EXTRAVERSION="-${{ env.VERSION }}"
-          make ARCH=arm64 LLVM=1 O=out -j$(nproc --all) EXTRAVERSION="-${{ env.VERSION }}"
+          make ARCH=arm64 LLVM=1 O=out ${{ github.event.inputs.defconfig }}
+          make ARCH=arm64 LLVM=1 O=out -j$(nproc --all)
+
+      - name: 改写内核版本头文件（后置修改，彻底规避编译语法错误）
+        run: |
+          cd /kernel/common/out
+          VER_SUFFIX="-${{ env.VERSION }}"
+          # 替换 utsrelease.h 内的版本后缀
+          sed -i "s/\(UTS_RELEASE.*\)\"/\1${VER_SUFFIX}\"/g" include/generated/utsrelease.h
+          cat include/generated/utsrelease.h
 
       - name: 上传内核镜像
         uses: actions/upload-artifact@v4
