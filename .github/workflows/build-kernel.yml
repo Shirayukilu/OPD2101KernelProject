@@ -34,7 +34,7 @@ on:
       ksu_version:
         description: '自定义 KernelSU 版本号(仅开启KSU时生效)'
         required: false
-        default: 'KSU-Standard'
+        default: 'KSUALLMANGER'
       include_susfs:
         description: '是否集成 SusFS (需要先开启KernelSU)'
         required: true
@@ -46,7 +46,7 @@ on:
       custom_version_name:
         description: '自定义内核版本号'
         required: false
-        default: 'Konary-SM8250'
+        default: 'KonaryKernel'
       include_build_date:
         description: '是否在版本号中加入编译日期'
         required: true
@@ -83,7 +83,7 @@ jobs:
           git clone --depth=1 --branch ${{ github.event.inputs.kernel_branch }} \
             ${{ github.event.inputs.kernel_repo }} kernel_source
 
-      - name: 构建标准编译目录
+      - name: 构建标准编译目录 & 统一授权
         run: |
           sudo mkdir -p /kernel/common
           sudo mv kernel_source/* /kernel/common/
@@ -91,6 +91,8 @@ jobs:
             sudo cp -r proprietary_drivers/vendor /
           fi
           sudo rm -rf kernel_source proprietary_drivers
+          sudo chown -R $USER:$USER /kernel
+          sudo chmod -R 777 /kernel
 
       - name: 集成 KernelSU (如果开启)
         if: ${{ github.event.inputs.include_ksu == 'true' }}
@@ -121,13 +123,12 @@ jobs:
             KERNEL_VER="${KERNEL_VER}-${BUILD_DATE}"
           fi
 
-          # 写入内核版本配置
-          echo "CONFIG_LOCALVERSION=\"-${KERNEL_VER}\"" >> arch/arm64/configs/${{ github.event.inputs.defconfig }}
+          # 【关键修复】用tee安全写入，避免sudo echo >>导致的shell解析异常
+          echo "CONFIG_LOCALVERSION=\"-${KERNEL_VER}\"" | sudo tee -a arch/arm64/configs/${{ github.event.inputs.defconfig }}
           echo "✅ 最终内核版本: ${KERNEL_VER}"
 
       - name: 编译内核
         run: |
-          sudo chown -R $USER:$USER /kernel
           cd /kernel/common
           make ARCH=arm64 LLVM=1 O=out ${{ github.event.inputs.defconfig }}
           make ARCH=arm64 LLVM=1 O=out -j$(nproc --all)
