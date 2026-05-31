@@ -6,19 +6,19 @@ on:
       proprietary_repo:
         description: '闭源驱动仓库地址'
         required: true
-        default: 'https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250'
+        default: 'https://github.com/Shirayukilu/Devicetree_oppo_sm8250_opd2101'
       proprietary_branch:
         description: '闭源驱动仓库分支'
         required: true
-        default: 'oneplus/sm8250_r_11.0.0'
+        default: 'oppo/sm8250_t_13.0.0_oppopad'
       kernel_repo:
         description: '内核源码仓库地址'
         required: true
-        default: 'https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8250'
+        default: 'https://github.com/Shirayukilu/android_kernel_oppo_sm8250'
       kernel_branch:
         description: '内核源码仓库分支'
         required: true
-        default: 'oneplus/sm8250_r_11.0.0'
+        default: 'lineage-23.0'
       defconfig:
         description: '配置文件名称'
         required: true
