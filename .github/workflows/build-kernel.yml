@@ -1,4 +1,4 @@
-name: 编译内核(ColorOS/SM8250-OPD2101)
+name: 编译内核(ColorOS/SM8250-OPD2101 | Android 16)
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ on:
         required: true
         default: 'https://github.com/Shirayukilu/android_kernel_oppo_sm8250'
       kernel_branch:
-        description: '内核源码分支'
+        description: '内核源码分支(Lineage 23.0 / Android 16)'
         required: true
         default: 'lineage-23.0'
       defconfig:
@@ -32,7 +32,7 @@ on:
           - 'true'
           - 'false'
       ksu_version:
-        description: '自定义 KernelSU 版本号(暂不生效，仅预留)'
+        description: '自定义 KernelSU 版本号'
         required: false
         default: 'KSU'
       include_susfs:
@@ -44,11 +44,11 @@ on:
           - 'true'
           - 'false'
       custom_version_name:
-        description: '自定义内核版本后缀(暂不生效，仅预留)'
+        description: '自定义内核版本后缀'
         required: false
         default: 'KonaryKernel'
       include_build_date:
-        description: '版本号追加编译日期(暂不生效，仅预留)'
+        description: '版本号追加编译日期'
         required: true
         default: 'true'
         type: choice
@@ -63,15 +63,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 安装编译依赖
+      - name: 安装全套编译依赖 + ARM64交叉编译链
         run: |
-          sudo apt update
-          sudo apt install -y build-essential libssl-dev bc flex bison git zip unzip curl wget tar xz-utils cpio rsync lzop xz-utils zstd libncurses-dev libffi-dev libbz2-dev llvm clang lld dwarves libelf-dev
+          sudo apt update -y
+          sudo apt install -y build-essential libssl-dev bc flex bison git zip unzip curl wget tar xz-utils cpio rsync lzop libncurses-dev libffi-dev
+          # 补齐aarch64交叉编译工具，解决CROSS_COMPILE依赖
+          sudo apt install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
       - name: 配置Swap内存
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 15
+
+      - name: 下载适配Android16的高版本Clang/LLVM
+        run: |
+          mkdir -p ~/toolchain
+          cd ~/toolchain
+          wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/clang+llvm-19.1.7-x86_64-linux-gnu.tar.xz
+          tar -xf clang+llvm-19.1.7-x86_64-linux-gnu.tar.xz
+          echo "CLANG_BIN=$HOME/toolchain/clang+llvm-19.1.7-x86_64-linux-gnu/bin" >> $GITHUB_ENV
 
       - name: 克隆设备树&驱动仓库
         run: |
@@ -108,16 +118,39 @@ jobs:
           cp -r susfs/kernel/* .
           rm -rf susfs
 
-      - name: 编译内核
+      - name: 拼接完整版本字符串
+        id: set_version
+        run: |
+          KERNEL_VER="${{ github.event.inputs.custom_version_name }}"
+          KSU_VER="${{ github.event.inputs.ksu_version }}"
+          if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
+            KERNEL_VER="${KERNEL_VER}-${KSU_VER}"
+          fi
+          if [ "${{ github.event.inputs.include_build_date }}" = "true" ]; then
+            BUILD_DATE=$(date +%Y%m%d)
+            KERNEL_VER="${KERNEL_VER}-${BUILD_DATE}"
+          fi
+          echo "VERSION=${KERNEL_VER}" >> $GITHUB_ENV
+          echo "✅ 内核版本后缀: ${KERNEL_VER}"
+
+      - name: Android16 内核编译 (Clang+LLVM 标准参数)
         run: |
           cd /kernel/common
-          make ARCH=arm64 LLVM=1 O=out ${{ github.event.inputs.defconfig }}
-          make ARCH=arm64 LLVM=1 O=out -j$(nproc)
+          export PATH=${{ env.CLANG_BIN }}:$PATH
+          # 标准安卓ARM64编译参数，适配Lineage 23 / Android 16
+          make ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 O=out ${{ github.event.inputs.defconfig }}
+          make ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 O=out -j$(nproc)
+
+      - name: 后置修改内核版本号
+        run: |
+          cd /kernel/common/out
+          VER_SUFFIX="-${{ env.VERSION }}"
+          sed -i "s/\(UTS_RELEASE.*\)\"/\1${VER_SUFFIX}\"/g" include/generated/utsrelease.h
 
       - name: 上传内核镜像
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-image
+          name: kernel-image-${{ github.event.inputs.custom_version_name }}
           path: |
             /kernel/common/out/arch/arm64/boot/Image.gz
             /kernel/common/out/arch/arm64/boot/Image
@@ -126,13 +159,26 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AK3
           cp /kernel/common/out/arch/arm64/boot/Image.gz AK3/
+
           sed -i 's/do.devicecheck=1/do.devicecheck=0/' AK3/anykernel.sh
           sed -i 's/do.modules=0/do.modules=1/' AK3/anykernel.sh
+
+          KERNEL_VER="${{ github.event.inputs.custom_version_name }}"
+          KSU_VER="${{ github.event.inputs.ksu_version }}"
+          if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
+            KERNEL_VER="${KERNEL_VER}-${KSU_VER}"
+          fi
+          if [ "${{ github.event.inputs.include_build_date }}" = "true" ]; then
+            BUILD_DATE=$(date +%Y%m%d)
+            KERNEL_VER="${KERNEL_VER}-${BUILD_DATE}"
+          fi
+
           cd AK3
-          zip -r9 ../Kernel.zip *
+          zip -r9 ../Kernel-${KERNEL_VER}.zip *
+          cd ..
 
       - name: 上传 AnyKernel3 刷机包
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-anykernel3
-          path: Kernel.zip
+          name: kernel-anykernel3-${{ github.event.inputs.custom_version_name }}
+          path: Kernel-*.zip
