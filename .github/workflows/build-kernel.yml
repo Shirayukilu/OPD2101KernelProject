@@ -1,14 +1,14 @@
-name: 编译内核(ColorOS/SM8250)
+name: 编译内核(ColorOS/SM8250-OPD2101)
 
 on:
   workflow_dispatch:
     inputs:
       proprietary_repo:
-        description: '闭源驱动仓库地址'
+        description: '设备树/驱动仓库地址'
         required: true
         default: 'https://github.com/Shirayukilu/Devicetree_oppo_sm8250_opd2101'
       proprietary_branch:
-        description: '闭源驱动仓库分支'
+        description: '驱动仓库分支'
         required: true
         default: 'oppo/sm8250_t_13.0.0_oppopad'
       kernel_repo:
@@ -16,11 +16,11 @@ on:
         required: true
         default: 'https://github.com/Shirayukilu/android_kernel_oppo_sm8250'
       kernel_branch:
-        description: '内核源码仓库分支'
+        description: '内核源码分支'
         required: true
         default: 'lineage-23.0'
       defconfig:
-        description: '配置文件名称'
+        description: '内核编译配置文件'
         required: true
         default: 'gki_defconfig'
       include_ksu:
@@ -32,11 +32,11 @@ on:
           - 'true'
           - 'false'
       ksu_version:
-        description: '自定义 KernelSU 版本号(仅开启KSU时生效)'
+        description: '自定义 KernelSU 版本号(仅开启KSU生效)'
         required: false
-        default: 'KSUALLMANGER'
+        default: 'KSU'
       include_susfs:
-        description: '是否集成 SusFS (需要先开启KernelSU)'
+        description: '是否集成 SusFS (依赖KernelSU)'
         required: true
         default: 'false'
         type: choice
@@ -44,11 +44,11 @@ on:
           - 'true'
           - 'false'
       custom_version_name:
-        description: '自定义内核版本号'
+        description: '自定义内核版本后缀'
         required: false
         default: 'KonaryKernel'
       include_build_date:
-        description: '是否在版本号中加入编译日期'
+        description: '版本号追加编译日期'
         required: true
         default: 'true'
         type: choice
@@ -63,17 +63,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 安装依赖库
+      - name: 安装编译依赖
         run: |
           sudo apt update
           sudo apt install -y build-essential libssl-dev bc flex bison git zip unzip curl wget tar xz-utils cpio rsync lzop xz-utils zstd libncurses-dev libffi-dev libbz2-dev llvm clang lld dwarves libelf-dev
 
-      - name: 将swap设置为15GB
+      - name: 配置Swap内存
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 15
 
-      - name: 克隆闭源驱动仓库
+      - name: 克隆设备树&驱动仓库
         run: |
           git clone --depth=1 --branch ${{ github.event.inputs.proprietary_branch }} \
             ${{ github.event.inputs.proprietary_repo }} proprietary_drivers
@@ -83,7 +83,7 @@ jobs:
           git clone --depth=1 --branch ${{ github.event.inputs.kernel_branch }} \
             ${{ github.event.inputs.kernel_repo }} kernel_source
 
-      - name: 构建标准编译目录 & 统一授权
+      - name: 构建编译目录 & 全局授权
         run: |
           sudo mkdir -p /kernel/common
           sudo mv kernel_source/* /kernel/common/
@@ -94,13 +94,13 @@ jobs:
           sudo chown -R $USER:$USER /kernel
           sudo chmod -R 777 /kernel
 
-      - name: 集成 KernelSU (如果开启)
+      - name: 集成 KernelSU
         if: ${{ github.event.inputs.include_ksu == 'true' }}
         run: |
           cd /kernel/common
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
-      - name: 集成 SusFS (如果开启)
+      - name: 集成 SusFS
         if: ${{ github.event.inputs.include_susfs == 'true' && github.event.inputs.include_ksu == 'true' }}
         run: |
           cd /kernel/common
@@ -108,13 +108,11 @@ jobs:
           cp -r susfs/kernel/* .
           rm -rf susfs
 
-      - name: 配置版本信息（内核+KSU+编译日期）
+      - name: 拼接完整版本字符串
+        id: set_version
         run: |
-          cd /kernel/common
           KERNEL_VER="${{ github.event.inputs.custom_version_name }}"
           KSU_VER="${{ github.event.inputs.ksu_version }}"
-
-          # 拼接完整版本
           if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
             KERNEL_VER="${KERNEL_VER}-${KSU_VER}"
           fi
@@ -122,18 +120,16 @@ jobs:
             BUILD_DATE=$(date +%Y%m%d)
             KERNEL_VER="${KERNEL_VER}-${BUILD_DATE}"
           fi
-
-          # 【关键修复】用tee安全写入，避免sudo echo >>导致的shell解析异常
-          echo "CONFIG_LOCALVERSION=\"-${KERNEL_VER}\"" | sudo tee -a arch/arm64/configs/${{ github.event.inputs.defconfig }}
-          echo "✅ 最终内核版本: ${KERNEL_VER}"
+          echo "VERSION=${KERNEL_VER}" >> $GITHUB_ENV
+          echo "✅ 内核版本后缀: ${KERNEL_VER}"
 
       - name: 编译内核
         run: |
           cd /kernel/common
-          make ARCH=arm64 LLVM=1 O=out ${{ github.event.inputs.defconfig }}
-          make ARCH=arm64 LLVM=1 O=out -j$(nproc --all)
+          make ARCH=arm64 LLVM=1 O=out ${{ github.event.inputs.defconfig }} EXTRAVERSION="-${{ env.VERSION }}"
+          make ARCH=arm64 LLVM=1 O=out -j$(nproc --all) EXTRAVERSION="-${{ env.VERSION }}"
 
-      - name: 上传内核镜像文件
+      - name: 上传内核镜像
         uses: actions/upload-artifact@v4
         with:
           name: kernel-image-${{ github.event.inputs.custom_version_name }}
@@ -141,7 +137,7 @@ jobs:
             /kernel/common/out/arch/arm64/boot/Image.gz
             /kernel/common/out/arch/arm64/boot/Image
 
-      - name: 打包成AnyKernel3压缩包
+      - name: 打包 AnyKernel3 卡刷包
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AK3
           cp /kernel/common/out/arch/arm64/boot/Image.gz AK3/
@@ -149,7 +145,6 @@ jobs:
           sed -i 's/do.devicecheck=1/do.devicecheck=0/' AK3/anykernel.sh
           sed -i 's/do.modules=0/do.modules=1/' AK3/anykernel.sh
 
-          # 拼接包名
           KERNEL_VER="${{ github.event.inputs.custom_version_name }}"
           KSU_VER="${{ github.event.inputs.ksu_version }}"
           if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
@@ -164,8 +159,8 @@ jobs:
           zip -r9 ../Kernel-${KERNEL_VER}.zip *
           cd ..
 
-      - name: 上传AnyKernel3刷机包
+      - name: 上传 AnyKernel3 刷机包
         uses: actions/upload-artifact@v4
         with:
-         name: kernel-anykernel3-${{ github.event.inputs.custom_version_name }}
-         path: Kernel-*.zip
+          name: kernel-anykernel3-${{ github.event.inputs.custom_version_name }}
+          path: Kernel-*.zip
