@@ -79,8 +79,9 @@ jobs:
         run: |
           mkdir -p ~/toolchain
           cd ~/toolchain
-          wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/clang+llvm-19.1.7-x86_64-linux-gnu.tar.xz
-          tar -xf clang+llvm-19.1.7-x86_64-linux-gnu.tar.xz
+          # 改用 curl 重试下载 + 固定稳定版本
+          curl -L -o clang.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/clang+llvm-19.1.7-x86_64-linux-gnu.tar.xz
+          tar -xf clang.tar.xz
           echo "CLANG_BIN=$HOME/toolchain/clang+llvm-19.1.7-x86_64-linux-gnu/bin" >> $GITHUB_ENV
 
       - name: 克隆设备树&驱动仓库
