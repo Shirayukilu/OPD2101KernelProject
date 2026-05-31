@@ -69,10 +69,10 @@
 
 | 参数 | 说明 | 示例 |
 | :--- | :--- | :--- |
-| `闭源驱动仓库地址` | OPPO Pad (OPD2101) 对应的设备树与驱动仓库地址 | `https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8250` |
-| `闭源驱动仓库分支` | 驱动仓库对应的分支，需与内核分支匹配 | `oneplus/sm8250_r_11.0.0` |
-| `内核源码仓库地址` | SM8250 内核源码仓库地址 | `https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8250` |
-| `开源仓库分支` | 内核源码对应的分支，需与驱动分支匹配 | `oneplus/sm8250_r_11.0.0` |
+| `闭源驱动仓库地址` | OPPO Pad (OPD2101) 对应的设备树与驱动仓库地址 | `https://github.com/Shirayukilu/Devicetree_oppo_sm8250_opd2101` |
+| `闭源驱动仓库分支` | 驱动仓库对应的分支，需与内核分支匹配 | `oppo/sm8250_t_13.0.0_oppopad` |
+| `内核源码仓库地址` | SM8250 内核源码仓库地址 | `https://github.com/Shirayukilu/android_kernel_oppo_sm8250` |
+| `开源仓库分支` | 内核源码对应的分支，需与驱动分支匹配 | `lineage-23.0` |
 | `配置文件名称` | 内核编译使用的 defconfig 文件 | `gki_defconfig` |
 | `是否集成 KernelSU` | 选择是否开启 KernelSU 内核级 Root 支持 | `true` / `false` |
 | `是否集成 SusFS` | 选择是否在 KSU 基础上集成 SusFS 隐藏模块（需先开启KSU） | `true` / `false` |
