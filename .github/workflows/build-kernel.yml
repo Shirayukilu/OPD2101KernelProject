@@ -1,14 +1,14 @@
-name: 编译内核(ColorOS/SM8250-OPD2101 | Android 16)
+name: 编译内核(ColorOS16 | SM8250-OPD2101)
 
 on:
   workflow_dispatch:
     inputs:
       proprietary_repo:
-        description: '设备树/驱动仓库地址'
+        description: '闭源驱动仓库地址'
         required: true
         default: 'https://github.com/Shirayukilu/Devicetree_oppo_sm8250_opd2101'
       proprietary_branch:
-        description: '驱动仓库分支'
+        description: '闭源驱动仓库分支'
         required: true
         default: 'oppo/sm8250_t_13.0.0_oppopad'
       kernel_repo:
@@ -16,13 +16,13 @@ on:
         required: true
         default: 'https://github.com/Shirayukilu/android_kernel_oppo_sm8250'
       kernel_branch:
-        description: '内核源码分支(Lineage 23.0 / Android 16)'
+        description: '内核源码仓库分支'
         required: true
         default: 'lineage-23.0'
       defconfig:
-        description: '内核编译配置文件'
-        required: true
-        default: 'gki_defconfig'
+       description: '配置文件名称'
+       required: true
+       default: 'gki_defconfig'
       include_ksu:
         description: '是否集成 KernelSU'
         required: true
@@ -32,11 +32,11 @@ on:
           - 'true'
           - 'false'
       ksu_version:
-        description: '自定义 KernelSU 版本号'
+        description: '自定义 KernelSU 版本名'
         required: false
         default: 'KSU'
       include_susfs:
-        description: '是否集成 SusFS (依赖KernelSU)'
+        description: '是否集成 SusFS(依赖KSU)'
         required: true
         default: 'false'
         type: choice
@@ -48,7 +48,7 @@ on:
         required: false
         default: 'KonaryKernel'
       include_build_date:
-        description: '版本号追加编译日期'
+        description: '版本追加编译日期'
         required: true
         default: 'true'
         type: choice
@@ -63,61 +63,66 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 安装全套编译依赖 + ARM64交叉编译链
+      - name: 安装依赖库
         run: |
-          sudo apt update -y
-          sudo apt install -y build-essential libssl-dev bc flex bison git zip unzip curl wget tar xz-utils cpio rsync lzop libncurses-dev libffi-dev
-          sudo apt install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+          sudo apt update
+          sudo apt install -y build-essential libssl-dev bc flex bison git zip unzip curl wget tar xz-utils cpio rsync lzop xz-utils zstd libncurses-dev libffi-dev libbz2-dev dnsutils net-tools lsb-release aria2 pigz llvm clang lld dwarves libelf-dev libssl-dev
 
-      - name: 配置Swap内存
+      - name: 将swap设置为15GB
         uses: pierotofy/set-swap-space@master
         with:
           swap-size-gb: 15
 
-      - name: 下载Google官方Android Clang工具链
-        run: |
-          mkdir -p ~/toolchain
-          cd ~/toolchain
-          curl -L -o clang.tar.gz https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r510928.tar.gz
-          tar -xf clang.tar.gz
-          echo "CLANG_BIN=$HOME/toolchain/clang-r510928/bin" >> $GITHUB_ENV
-
-      - name: 克隆设备树&驱动仓库
+      - name: 克隆驱动仓库源码
         run: |
           git clone --depth=1 --branch ${{ github.event.inputs.proprietary_branch }} \
             ${{ github.event.inputs.proprietary_repo }} proprietary_drivers
 
-      - name: 克隆内核源码仓库
+      - name: 移动驱动文件(原版目录逻辑)
+        run: |
+          cd proprietary_drivers
+          if [ -d "vendor" ]; then
+            echo "Moving vendor to /..."
+            sudo mv vendor /
+          fi
+          if [ -d "kernel_platform" ]; then
+            echo "Moving kernel_platform to /..."
+            sudo mv kernel_platform /
+          else
+            echo "kernel_platform 不存在，跳过"
+          fi
+
+      - name: 克隆内核仓库源码
         run: |
           git clone --depth=1 --branch ${{ github.event.inputs.kernel_branch }} \
             ${{ github.event.inputs.kernel_repo }} kernel_source
 
-      - name: 构建编译目录 & 全局授权
+      - name: 准备编译目录(原版路径 /kernel_platform/common)
         run: |
-          sudo mkdir -p /kernel/common
-          sudo mv kernel_source/* /kernel/common/
-          if [ -d "proprietary_drivers/vendor" ]; then
-            sudo cp -r proprietary_drivers/vendor /
-          fi
-          sudo rm -rf kernel_source proprietary_drivers
-          sudo chown -R $USER:$USER /kernel
-          sudo chmod -R 777 /kernel
+          echo "Creating /kernel_platform/common..."
+          sudo mkdir -p /kernel_platform/common
+          echo "Moving kernel source to /kernel_platform/common..."
+          sudo mv kernel_source/* /kernel_platform/common/
+          sudo rm -rf kernel_source
+          echo "Final structure:"
+          ls -la /kernel_platform/
+          ls -la /kernel_platform/common/
 
       - name: 集成 KernelSU
         if: ${{ github.event.inputs.include_ksu == 'true' }}
         run: |
-          cd /kernel/common
+          cd /kernel_platform/common
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 
       - name: 集成 SusFS
         if: ${{ github.event.inputs.include_susfs == 'true' && github.event.inputs.include_ksu == 'true' }}
         run: |
-          cd /kernel/common
+          cd /kernel_platform/common
           git clone --depth=1 https://github.com/5ec1cff/KernelSU_SusFS.git susfs
           cp -r susfs/kernel/* .
           rm -rf susfs
 
-      - name: 拼接完整版本字符串
+      - name: 拼接版本字符串
         id: set_version
         run: |
           KERNEL_VER="${{ github.event.inputs.custom_version_name }}"
@@ -132,51 +137,48 @@ jobs:
           echo "VERSION=${KERNEL_VER}" >> $GITHUB_ENV
           echo "✅ 内核版本后缀: ${KERNEL_VER}"
 
-      - name: Android16 内核编译 (Clang+LLVM 标准参数)
+      - name: 编译内核(完全沿用原版编译命令)
         run: |
-          cd /kernel/common
-          export PATH=${{ env.CLANG_BIN }}:$PATH
-          make ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 O=out ${{ github.event.inputs.defconfig }}
-          make ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 O=out -j$(nproc)
+          sudo chown -R $USER:$USER /kernel_platform
+          cd /kernel_platform/common
+          echo "Running make gki_defconfig..."
+          make ARCH=arm64 LLVM=1 O=out ${{ github.event.inputs.defconfig }}
+          echo "Starting compilation..."
+          make ARCH=arm64 LLVM=1 O=out -j$(nproc --all)
 
-      - name: 后置修改内核版本号
+      - name: 改写内核版本头文件(后置修改，不影响编译)
         run: |
-          cd /kernel/common/out
+          cd /kernel_platform/common/out
           VER_SUFFIX="-${{ env.VERSION }}"
           sed -i "s/\(UTS_RELEASE.*\)\"/\1${VER_SUFFIX}\"/g" include/generated/utsrelease.h
 
-      - name: 上传内核镜像
+      - name: 上传内核文件
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-image-${{ github.event.inputs.custom_version_name }}
+          name: kernel-image
           path: |
-            /kernel/common/out/arch/arm64/boot/Image.gz
-            /kernel/common/out/arch/arm64/boot/Image
+            /kernel_platform/common/out/arch/arm64/boot/Image.gz
+            /kernel_platform/common/out/arch/arm64/boot/Image
 
-      - name: 打包 AnyKernel3 卡刷包
+      - name: 打包成AnyKernel3压缩包
         run: |
+          echo "Cloning AnyKernel3..."
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3 AK3
-          cp /kernel/common/out/arch/arm64/boot/Image.gz AK3/
 
+          echo "Copying kernel image..."
+          cp /kernel_platform/common/out/arch/arm64/boot/Image.gz AK3/
+
+          echo "Setting up anykernel.sh..."
           sed -i 's/do.devicecheck=1/do.devicecheck=0/' AK3/anykernel.sh
           sed -i 's/do.modules=0/do.modules=1/' AK3/anykernel.sh
 
-          KERNEL_VER="${{ github.event.inputs.custom_version_name }}"
-          KSU_VER="${{ github.event.inputs.ksu_version }}"
-          if [ "${{ github.event.inputs.include_ksu }}" = "true" ]; then
-            KERNEL_VER="${KERNEL_VER}-${KSU_VER}"
-          fi
-          if [ "${{ github.event.inputs.include_build_date }}" = "true" ]; then
-            BUILD_DATE=$(date +%Y%m%d)
-            KERNEL_VER="${KERNEL_VER}-${BUILD_DATE}"
-          fi
-
+          echo "Zipping..."
           cd AK3
-          zip -r9 ../Kernel-${KERNEL_VER}.zip *
+          zip -r9 ../Kernel-AnyKernel3.zip *
           cd ..
 
-      - name: 上传 AnyKernel3 刷机包
+      - name: 上传AnyKernel3压缩包
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-anykernel3-${{ github.event.inputs.custom_version_name }}
-          path: Kernel-*.zip
+         name: kernel-anykernel3
+         path: Kernel-AnyKernel3.zip
