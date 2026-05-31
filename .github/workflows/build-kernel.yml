@@ -67,7 +67,6 @@ jobs:
         run: |
           sudo apt update -y
           sudo apt install -y build-essential libssl-dev bc flex bison git zip unzip curl wget tar xz-utils cpio rsync lzop libncurses-dev libffi-dev
-          # 补齐aarch64交叉编译工具，解决CROSS_COMPILE依赖
           sudo apt install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
       - name: 配置Swap内存
@@ -75,14 +74,13 @@ jobs:
         with:
           swap-size-gb: 15
 
-      - name: 下载适配Android16的高版本Clang/LLVM
+      - name: 下载Google官方Android Clang工具链
         run: |
           mkdir -p ~/toolchain
           cd ~/toolchain
-          # 改用 curl 重试下载 + 固定稳定版本
-          curl -L -o clang.tar.xz https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/clang+llvm-19.1.7-x86_64-linux-gnu.tar.xz
-          tar -xf clang.tar.xz
-          echo "CLANG_BIN=$HOME/toolchain/clang+llvm-19.1.7-x86_64-linux-gnu/bin" >> $GITHUB_ENV
+          curl -L -o clang.tar.gz https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r510928.tar.gz
+          tar -xf clang.tar.gz
+          echo "CLANG_BIN=$HOME/toolchain/clang-r510928/bin" >> $GITHUB_ENV
 
       - name: 克隆设备树&驱动仓库
         run: |
@@ -138,7 +136,6 @@ jobs:
         run: |
           cd /kernel/common
           export PATH=${{ env.CLANG_BIN }}:$PATH
-          # 标准安卓ARM64编译参数，适配Lineage 23 / Android 16
           make ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 O=out ${{ github.event.inputs.defconfig }}
           make ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 O=out -j$(nproc)
 
