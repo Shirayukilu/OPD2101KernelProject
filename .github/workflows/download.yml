@@ -1,0 +1,34 @@
+name: 下载内核源码
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_url:
+        description: '要克隆的 GitHub 仓库 HTTPS 地址'
+        required: true
+        default: 'https://github.com/oppo-source/android_kernel_oppo_sm6375.git'
+      branch:
+        description: '要打包的分支名称'
+        required: true
+        default: 'oppo/sm6375_t_13.1.0_oppo_a1_5g'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 克隆源码
+        run: |
+          git clone --branch ${{ github.event.inputs.branch }} ${{ github.event.inputs.repo_url }} source_code
+      - name: 删除.git目录
+        run: |
+          rm -rf source_code/.git
+      - name: 打包为 tar.gz
+        run: |
+          tar -zcvf kernel_source.tar.gz -C source_code .
+      - name: 上传打包文件供下载
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-source-tar
+          path: kernel_source.tar.gz
