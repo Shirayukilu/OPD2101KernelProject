@@ -4,7 +4,7 @@
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/你的用户名/你的仓库名/build.yml?branch=构建内核&label=编译状态&style=flat-square)](https://github.com/你的用户名/你的仓库名/actions)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-SM8250-lightgrey.svg?style=flat-square)](https://github.com/OnePlusOSS)
-[![Device](https://img.shields.io/badge/device-OPPO%20Pad%20(OPD2101)-green.svg?style=flat-square)](https://www.oppo.com/)
+[![Device](https://img.shields.io/badge/device-OPPO%20Pad%20(OPD2101)-green.svg?style=flat-square)](https://www.oppo.com/cn/accessories/oppo-pad/)
 
 ---
 
