@@ -9,7 +9,7 @@
 ---
 
 ## 📖 项目介绍
-`KonaryKernelProject` 是一个为 **OPPO Pad (OPD2101，骁龙SM8250)** 打造的开源内核项目，基于 OnePlusOSS 官方内核源码二次开发。
+`KonaryKernelProject` 是一个为 **OPPO Pad (OPD2101，骁龙SM8250)** 打造的开源内核项目，基于 OPPO-Source 官方内核源码二次开发。
 项目的核心目标是：
 - 提供比官方内核更稳定、更流畅的使用体验
 - 保留官方兼容性的同时，加入实用的自定义功能
