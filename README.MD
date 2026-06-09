@@ -1,4 +1,4 @@
-# 🛠️ KonaryKernelProject
+# 🛠️ OPD2101KernelProject
 > 为 OPPO Pad (OPD2101 / SM8250) 打造的定制内核项目，基于官方开源源码深度优化，云端一键编译，打造流畅、稳定、可定制的专属内核体验。
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/你的用户名/你的仓库名/build.yml?branch=构建内核&label=编译状态&style=flat-square)](https://github.com/你的用户名/你的仓库名/actions)
@@ -9,7 +9,7 @@
 ---
 
 ## 📖 项目介绍
-`KonaryKernelProject` 是一个为 **OPPO Pad (OPD2101，骁龙SM8250)** 打造的开源内核项目，基于 OPPO-Source 官方内核源码二次开发。
+`OPD2101KernelProject` 是一个为 **OPPO Pad (OPD2101，骁龙SM8250)** 打造的开源内核项目，基于 OPPO-Source 官方内核源码二次开发。
 项目的核心目标是：
 - 提供比官方内核更稳定、更流畅的使用体验
 - 保留官方兼容性的同时，加入实用的自定义功能
@@ -76,7 +76,7 @@
 | `配置文件名称` | 内核编译使用的 defconfig 文件 | `gki_defconfig` |
 | `是否集成 KernelSU` | 选择是否开启 KernelSU 内核级 Root 支持 | `true` / `false` |
 | `是否集成 SusFS` | 选择是否在 KSU 基础上集成 SusFS 隐藏模块（需先开启KSU） | `true` / `false` |
-| `自定义内核版本号` | 自定义内核版本后缀，如 `Konary-v1.0` | `Konary-v1.0-KSU` |
+| `自定义内核版本号` | 自定义内核版本后缀，如 `opd-v1.0` | `opd-v1.0-KSU` |
 | `是否加入编译日期` | 选择是否在版本号后自动添加编译日期 | `true` / `false` |
 
 ---
